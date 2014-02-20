@@ -128,50 +128,9 @@ bytestring bs2str(const bytestring& in)
     return out;
 }
 
-PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
+bool communicate_with_card(pam_handle_t *pamh, const pam_conv *conv, silvia_card_channel* card, std::vector<bytestring>& commands, std::vector<bytestring>& results)
 {
-    // Get the username
-    int result;
-    const char *username;
-    result = pam_get_user(pamh, &username, NULL);
-
-    const void *conv_void;
-    if(pam_get_item(pamh, PAM_CONV, &conv_void) != PAM_SUCCESS)
-    {
-        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to get PAM_CONV");
-        return PAM_AUTHINFO_UNAVAIL;
-    }
-    const pam_conv *conv = (pam_conv*)conv_void;
-
-    // Initiate IRMA stuff
-    set_parameters();
-    silvia_verifier_specification *vspec = silvia_irma_xmlreader::i()->read_verifier_spec(ISSUER_XML_PATH, VERIFIER_XML_PATH);
-    if(vspec == NULL)
-    {
-        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read issuer and verifier specs");
-        return PAM_AUTHINFO_UNAVAIL;
-    }
-    silvia_pub_key *pubkey = silvia_idemix_xmlreader::i()->read_idemix_pubkey(ISSUER_IPK_PATH);
-    if(pubkey == NULL)
-    {
-        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read issuer public key");
-        return PAM_AUTHINFO_UNAVAIL;
-    }
-    silvia_irma_verifier verifier(pubkey, vspec);
-
-
-    show_pam_info(conv, "Please hold card against reader");
-    silvia_nfc_card *card = NULL;
-    if(!silvia_nfc_card_monitor::i()->wait_for_card(&card))
-    {
-        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read the card");
-        return PAM_AUTHINFO_UNAVAIL;
-    }
-
-    // Actually get info from the card NOW
     show_pam_info(conv, "Communicating with card...");
-    std::vector<bytestring> commands = verifier.get_proof_commands();
-    std::vector<bytestring> results;
     bool comm_ok = true;
     size_t cmd_ctr = 0;
 
@@ -210,61 +169,111 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
         results.push_back(result);
     }
+    return comm_ok;
+}
 
-    if(comm_ok)
+PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
+{
+    int exitcode = PAM_AUTH_ERR;
+    silvia_verifier_specification *vspec;
+    silvia_pub_key *pubkey;
+    silvia_nfc_card *card;
+
+    // Get the username
+    int result;
+    const char *username;
+    result = pam_get_user(pamh, &username, NULL);
+
+    const void *conv_void;
+    if(pam_get_item(pamh, PAM_CONV, &conv_void) != PAM_SUCCESS)
     {
-        show_pam_info(conv, "Verifying proof...");
-
-        std::vector<std::pair<std::string, bytestring> > revealed;
-
-        if(verifier.submit_and_verify(results, revealed))
-        {
-            if(revealed.size() > 0)
-            {
-                std::vector<std::pair<std::string, bytestring> >::iterator i = revealed.begin();
-
-                // Check if first attribute is "expires"
-                if(i->first == "expires")
-                {
-                    //Check expiry.... TODO
-                
-                    i++;
-                }
-
-                for(; i != revealed.end(); i++)
-                {
-                    const char *key = i->first.c_str();
-                    const char *value = (const char*) bs2str(i->second).byte_str();
-
-                    pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Attribute revealed: %s = %s", key, value);
-
-                    //If correct one found, return PAM_SUCCESS
-                }
-                return PAM_AUTHINFO_UNAVAIL;
-            }
-            else
-            {
-                pam_syslog(pamh, LOG_AUTH | LOG_ERR, "No attributes revealed");
-                return PAM_AUTHINFO_UNAVAIL;
-            }
-        }
-        else
-        {
-            pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Verification failed");
-            return PAM_AUTH_ERR;
-        }
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to get PAM_CONV");
+        return PAM_AUTHINFO_UNAVAIL;
     }
-    else
-    {
-        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Error communicating with card");
-        verifier.abort();
-        delete card;
-        delete vspec;
-        delete pubkey;
+    const pam_conv *conv = (pam_conv*)conv_void;
 
+    // Initiate IRMA stuff
+    set_parameters();
+    vspec = silvia_irma_xmlreader::i()->read_verifier_spec(ISSUER_XML_PATH, VERIFIER_XML_PATH);
+    if(vspec == NULL)
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read issuer and verifier specs");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    pubkey = silvia_idemix_xmlreader::i()->read_idemix_pubkey(ISSUER_IPK_PATH);
+    if(pubkey == NULL)
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read issuer public key");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    silvia_irma_verifier verifier(pubkey, vspec);
+
+    pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Verifier name: %s, short msg: %s", vspec->get_verifier_name().c_str(), vspec->get_short_msg().c_str());
+
+
+    show_pam_info(conv, "Please hold card against reader");
+    card = NULL;
+    if(!silvia_nfc_card_monitor::i()->wait_for_card(&card))
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read the card");
         return PAM_AUTHINFO_UNAVAIL;
     }
 
-    pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unreachable part reached???");
-    return PAM_AUTH_ERR;
+    // Actually get info from the card NOW
+    show_pam_info(conv, "Initializing card...");
+    std::vector<bytestring> results;
+    std::vector<bytestring> commands = verifier.get_select_commands();
+    if(!communicate_with_card(pamh, conv, card, commands, results))
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to select application on card");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    if(!verifier.submit_select_data(results))
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to verify application selection");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    commands.clear();
+    results.clear();
+    show_pam_info(conv, "Communicating with card...");
+    bool comm_ok = true;
+    size_t cmd_ctr = 0;
+
+    commands = verifier.get_proof_commands();
+    if(!communicate_with_card(pamh, conv, card, commands, results))
+    {
+        verifier.abort();
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to execute proof comments");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    std::vector<std::pair<std::string, bytestring> > revealed;
+    show_pam_info(conv, "Verifying...");
+    if(!verifier.submit_and_verify(results, revealed))
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Verification failed");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    if(revealed.size() <= 0)
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "No attributes revealed");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    
+    std::vector<std::pair<std::string, bytestring> >::iterator i = revealed.begin();
+
+    if((i->first == "expires") || (i->first == "metadata"))
+    {
+        //Check if this is expires or whatever... IGNORE FOR NOW
+        //TODO!!!!
+    }
+
+    for(; i != revealed.end(); i++)
+    {
+        const char *key = i->first.c_str();
+        const char *value = (const char*) bs2str(i->second).byte_str();
+
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Attribute read: %s = %s", key, value);
+    }
+
+    return PAM_AUTHINFO_UNAVAIL;
 }
