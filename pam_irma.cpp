@@ -273,6 +273,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     
     std::vector<std::pair<std::string, bytestring> >::iterator i = revealed.begin();
 
+    struct tm *expiry = NULL;
     if((i->first == "expires") || (i->first == "metadata"))
     {
         // Check if this is an "old style" expires or a "new style" expires attribute
@@ -294,21 +295,13 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
                 expires += i->second[IRMA_VERIFIER_METADATA_OFFSET + 3];
                 
                 expires *= 86400; // convert days to seconds
-                struct tm* date = gmtime(&expires);
+                expiry = gmtime(&expires);
                 
                 // Reconstruct credential ID as issued from metadata
                 unsigned short issued_id = 0;
                 
                 issued_id += i->second[IRMA_VERIFIER_METADATA_OFFSET + 4] << 8;
                 issued_id += i->second[IRMA_VERIFIER_METADATA_OFFSET + 5];
-                
-                printf("%-20s|%d (%s)\n", "credential ID", issued_id, (issued_id == vspec->get_credential_id()) ? "matches" : "DOES NOT MATCH");
-                
-                printf("%-20s|%s %s %d %d\n", i->first.c_str(),
-                    weekday[date->tm_wday],
-                    month[date->tm_mon],
-                    date->tm_mday,
-                    date->tm_year + 1900);
             }
         }
         else
@@ -317,13 +310,12 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
             expires = (i->second[i->second.size() - 2] << 8) + (i->second[i->second.size() - 1]);
             expires *= 86400; // convert days to seconds
         
-            struct tm* date = gmtime(&expires);
-            
-            printf("%-20s|%s %s %d %d\n", i->first.c_str(),
-                weekday[date->tm_wday],
-                month[date->tm_mon],
-                date->tm_mday,
-                date->tm_year + 1900);
+            expiry = gmtime(&expires);
+        }
+
+        if(expiry != NULL)
+        {
+            //Check if maybe credential is expired
         }
 
         i++;
