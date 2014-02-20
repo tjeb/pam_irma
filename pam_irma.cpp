@@ -28,6 +28,13 @@
 #define ISSUER_IPK_PATH "/etc/silvia/ipk.xml"
 
 
+const char* weekday[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+
+const char* month[12] = { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" };
+
+#define IRMA_VERIFIER_METADATA_OFFSET               (32 - 6)
+
+
 void set_parameters()
 {
     ////////////////////////////////////////////////////////////////////
@@ -268,8 +275,56 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     if((i->first == "expires") || (i->first == "metadata"))
     {
-        //Check if this is expires or whatever... IGNORE FOR NOW
-        //TODO!!!!
+        // Check if this is an "old style" expires or a "new style" expires attribute
+        time_t expires;
+        
+        if (i->second[IRMA_VERIFIER_METADATA_OFFSET] != 0x00)
+        {
+            // Check metadata version number
+            if (i->second[IRMA_VERIFIER_METADATA_OFFSET] != 0x01)
+            {
+                printf("Invalid metadata attribute found!\n");
+            }
+            else
+            {
+                // Reconstruct expiry data from metadata
+                expires = 0;
+                expires += i->second[IRMA_VERIFIER_METADATA_OFFSET + 1] << 16;
+                expires += i->second[IRMA_VERIFIER_METADATA_OFFSET + 2] << 8;
+                expires += i->second[IRMA_VERIFIER_METADATA_OFFSET + 3];
+                
+                expires *= 86400; // convert days to seconds
+                struct tm* date = gmtime(&expires);
+                
+                // Reconstruct credential ID as issued from metadata
+                unsigned short issued_id = 0;
+                
+                issued_id += i->second[IRMA_VERIFIER_METADATA_OFFSET + 4] << 8;
+                issued_id += i->second[IRMA_VERIFIER_METADATA_OFFSET + 5];
+                
+                printf("%-20s|%d (%s)\n", "credential ID", issued_id, (issued_id == vspec->get_credential_id()) ? "matches" : "DOES NOT MATCH");
+                
+                printf("%-20s|%s %s %d %d\n", i->first.c_str(),
+                    weekday[date->tm_wday],
+                    month[date->tm_mon],
+                    date->tm_mday,
+                    date->tm_year + 1900);
+            }
+        }
+        else
+        {
+            // This is old style
+            expires = (i->second[i->second.size() - 2] << 8) + (i->second[i->second.size() - 1]);
+            expires *= 86400; // convert days to seconds
+        
+            struct tm* date = gmtime(&expires);
+            
+            printf("%-20s|%s %s %d %d\n", i->first.c_str(),
+                weekday[date->tm_wday],
+                month[date->tm_mon],
+                date->tm_mday,
+                date->tm_year + 1900);
+        }
 
         i++;
     }
@@ -278,10 +333,10 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     for(; i != revealed.end(); i++)
     {
         const char *key = i->first.c_str();
-        const char *value = (const char *)bs2str(i->second).byte_str();
+        unsigned char *value = bs2str(i->second).byte_str();
 
-        show_pam_info(conv, key);
-        show_pam_info(conv, value);
+        printf("Key: %s\n", key);
+        printf("Value: %s\n", value);
 
     }
 
