@@ -160,7 +160,9 @@ bool communicate_with_card(pam_handle_t *pamh, const pam_conv *conv, silvia_card
                 break;
             }
         }
-        else if(result.substr(result.size() - 2) == "9000")
+		else if ((result.substr(result.size() - 2) != "9000") && 
+		         (result.substr(result.size() - 2) != "6A82") &&
+		         (result.substr(result.size() - 2) != "6D00"))
         {
             pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Error communicating with card: (0x%s) ", result.substr(result.size() - 2).hex_str().c_str());
             comm_ok = false;
@@ -207,8 +209,6 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         return PAM_AUTHINFO_UNAVAIL;
     }
     silvia_irma_verifier verifier(pubkey, vspec);
-
-    pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Verifier name: %s, short msg: %s", vspec->get_verifier_name().c_str(), vspec->get_short_msg().c_str());
 
 
     show_pam_info(conv, "Please hold card against reader");
