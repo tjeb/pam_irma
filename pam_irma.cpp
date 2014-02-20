@@ -22,7 +22,7 @@
 #define ISSUER_IPK_PATH "/etc/silvia/ipk.xml"
 
 
-/*void set_parameters()
+void set_parameters()
 {
     ////////////////////////////////////////////////////////////////////
     // Set the system parameters in the IRMA library; this function must
@@ -37,7 +37,7 @@
     silvia_system_parameters::i()->set_l_e(597);
     silvia_system_parameters::i()->set_l_e_prime(120);
     silvia_system_parameters::i()->set_hash_type("sha256");
-}*/
+}
 
 
 PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
