@@ -17,8 +17,12 @@
 #include "silvia/silvia_types.h"
 
 
+#define VERIFIER_XML_PATH "/etc/silvia/verifier.xml"
+#define ISSUER_XML_PATH "/etc/silvia/issuer.xml"
+#define ISSUER_IPK_PATH "/etc/silvia/ipk.xml"
 
-void set_parameters()
+
+/*void set_parameters()
 {
     ////////////////////////////////////////////////////////////////////
     // Set the system parameters in the IRMA library; this function must
@@ -33,7 +37,7 @@ void set_parameters()
     silvia_system_parameters::i()->set_l_e(597);
     silvia_system_parameters::i()->set_l_e_prime(120);
     silvia_system_parameters::i()->set_hash_type("sha256");
-}
+}*/
 
 
 PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
@@ -43,7 +47,6 @@ PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const cha
 
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-    printf("sm_authenticate");
     int result;
 
     pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Testing123!");

@@ -2,7 +2,7 @@
 
 do:
 	g++ -fPIC -c pam_irma.cpp
-	g++ -shared -o pam_irma.so pam_irma.o -lpam
+	g++ -shared -o pam_irma.so pam_irma.o -lpam -lsilvia
 	rm -f pam_irma.o
 
 install: pam_irma.so
