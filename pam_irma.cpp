@@ -64,6 +64,70 @@ void show_pam_info(const pam_conv *conv, const char *msgtxt)
     conv->conv(1, msgs, &resp, conv->appdata_ptr);
 }
 
+bool verify_pin(pam_handle_t *pamh, const pam_conv *conv, silvia_card_channel *card)
+{
+    pam_message *msg = (pam_message*)malloc(sizeof(pam_message));
+    msg->msg_style = PAM_PROMPT_ECHO_OFF;
+    msg->msg = "Please enter your PIN code: ";
+    const pam_message **msgs = (const pam_message**)malloc(sizeof(pam_message*));
+    msgs[0] = msg;
+    pam_response *resp;
+    conv->conv(1, msgs, &resp, conv->appdata_ptr);
+
+    show_pam_info(conv, "Verifying PIN...");
+
+    bytestring verify_pin_apdu = "0020000008";
+    for(int i = 0; i < strlen(resp->resp); i++)
+    {
+        verify_pin_apdu += (unsigned char)resp->resp[i];
+    }
+
+    while(verify_pin_apdu.size() < 13)
+    {
+        verify_pin_apdu += "00";
+    }
+
+    bytestring data;
+    unsigned short sw;
+
+    if(!card->transmit(verify_pin_apdu, data, sw))
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "PIN: Card communication failed");
+        return false;
+    }
+
+    if(sw == 0x9000)
+    {
+        return true;
+    }
+    else if((sw >= 0x636C0) && (sw <= 0x63CF))
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "PIN: FAILED (%u attempts remaining)", sw - 0x63C0);
+    }
+    else
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "PIN: FAILED (card error 0x&04X)", sw);
+    }
+
+    return false;
+}
+
+bytestring bs2str(const bytestring& in)
+{
+    bytestring out = in;
+
+    // Strip leading 00's
+    while ((out.size() > 0) && (out[0] == 0x00))
+    {
+        out = out.substr(1);
+    }
+
+    // Append null-termination
+    out += 0x00;
+
+    return out;
+}
+
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
     // Get the username
@@ -97,18 +161,110 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
 
     show_pam_info(conv, "Please hold card against reader");
-    silvia_nfc_card *nfc_card = NULL;
-    if(!silvia_nfc_card_monitor::i()->wait_for_card(&nfc_card))
+    silvia_nfc_card *card = NULL;
+    if(!silvia_nfc_card_monitor::i()->wait_for_card(&card))
     {
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read the card");
         return PAM_AUTHINFO_UNAVAIL;
     }
 
     // Actually get info from the card NOW
-    //std::vector<bytestring> commands = verifier.get_proof_commands();
-    
+    show_pam_info(conv, "Communicating with card...");
+    std::vector<bytestring> commands = verifier.get_proof_commands();
+    std::vector<bytestring> results;
+    bool comm_ok = true;
+    size_t cmd_ctr = 0;
 
+    for(std::vector<bytestring>::iterator i = commands.begin(); i != commands.end(); i++)
+    {
+        bytestring result;
+        if(!card->transmit(*i, result))
+        {
+            comm_ok = false;
+            break;
+        }
+        cmd_ctr++;
+        if(result.substr(result.size() - 2) == "6982")
+        {
+            //Card wants us to enter PIN
+            if(!verify_pin(pamh, conv, card))
+            {
+                comm_ok = false;
+                break;
+            }
 
+            show_pam_info(conv, "Communicating with card...");
 
-    return PAM_SUCCESS;
+            if(!card->transmit(*i, result))
+            {
+                comm_ok = false;
+                break;
+            }
+        }
+        else if(result.substr(result.size() - 2) == "9000")
+        {
+            pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Error communicating with card: (0x%s) ", result.substr(result.size() - 2).hex_str().c_str());
+            comm_ok = false;
+            break;
+        }
+
+        results.push_back(result);
+    }
+
+    if(comm_ok)
+    {
+        show_pam_info(conv, "Verifying proof...");
+
+        std::vector<std::pair<std::string, bytestring> > revealed;
+
+        if(verifier.submit_and_verify(results, revealed))
+        {
+            if(revealed.size() > 0)
+            {
+                std::vector<std::pair<std::string, bytestring> >::iterator i = revealed.begin();
+
+                // Check if first attribute is "expires"
+                if(i->first == "expires")
+                {
+                    //Check expiry.... TODO
+                
+                    i++;
+                }
+
+                for(; i != revealed.end(); i++)
+                {
+                    const char *key = i->first.c_str();
+                    const char *value = (const char*) bs2str(i->second).byte_str();
+
+                    pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Attribute revealed: %s = %s", key, value);
+
+                    //If correct one found, return PAM_SUCCESS
+                }
+                return PAM_AUTHINFO_UNAVAIL;
+            }
+            else
+            {
+                pam_syslog(pamh, LOG_AUTH | LOG_ERR, "No attributes revealed");
+                return PAM_AUTHINFO_UNAVAIL;
+            }
+        }
+        else
+        {
+            pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Verification failed");
+            return PAM_AUTH_ERR;
+        }
+    }
+    else
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Error communicating with card");
+        verifier.abort();
+        delete card;
+        delete vspec;
+        delete pubkey;
+
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+
+    pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unreachable part reached???");
+    return PAM_AUTH_ERR;
 }
