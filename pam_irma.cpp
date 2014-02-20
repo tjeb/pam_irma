@@ -265,14 +265,19 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     {
         //Check if this is expires or whatever... IGNORE FOR NOW
         //TODO!!!!
+
+        i++;
     }
 
+    show_pam_info(conv, "INFOS: ");
     for(; i != revealed.end(); i++)
     {
         const char *key = i->first.c_str();
-        const char *value = (const char*) bs2str(i->second).byte_str();
+        const char *value = (const char *)bs2str(i->second).byte_str();
 
-        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Attribute read: %s = %s", key, value);
+        show_pam_info(conv, key);
+        show_pam_info(conv, value);
+
     }
 
     return PAM_AUTHINFO_UNAVAIL;
