@@ -2,6 +2,12 @@
 #include <stdio.h>
 #include <syslog.h>
 
+#include <string>
+#include <iostream>
+#include <unistd.h>
+#include <time.h>
+#include <signal.h>
+
 #define PAM_SM_AUTH
 
 #include <security/pam_appl.h>
@@ -45,18 +51,64 @@ PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const cha
     return PAM_SUCCESS;
 }
 
+void show_pam_info(const pam_conv *conv, const char *msgtxt)
+{
+    pam_message *msg = (pam_message*)malloc(sizeof(pam_message));
+    msg->msg_style = PAM_TEXT_INFO;
+    msg->msg = msgtxt;
+    const pam_message **msgs = (const pam_message**)malloc(sizeof(pam_message*));
+    msgs[0] = msg;
+
+    pam_response *resp;
+
+    conv->conv(1, msgs, &resp, conv->appdata_ptr);
+}
+
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-    set_parameters();
-
+    // Get the username
     int result;
-
-    pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Testing123!");
-
     const char *username;
     result = pam_get_user(pamh, &username, NULL);
 
-    pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Username: %s", username);
+    const void *conv_void;
+    if(pam_get_item(pamh, PAM_CONV, &conv_void) != PAM_SUCCESS)
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to get PAM_CONV");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    const pam_conv *conv = (pam_conv*)conv_void;
+
+    // Initiate IRMA stuff
+    set_parameters();
+    silvia_verifier_specification *vspec = silvia_irma_xmlreader::i()->read_verifier_spec(ISSUER_XML_PATH, VERIFIER_XML_PATH);
+    if(vspec == NULL)
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read issuer and verifier specs");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    silvia_pub_key *pubkey = silvia_idemix_xmlreader::i()->read_idemix_pubkey(ISSUER_IPK_PATH);
+    if(pubkey == NULL)
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read issuer public key");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    silvia_irma_verifier verifier(pubkey, vspec);
+
+
+    show_pam_info(conv, "Please hold card against reader");
+    silvia_nfc_card *nfc_card = NULL;
+    if(!silvia_nfc_card_monitor::i()->wait_for_card(&nfc_card))
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read the card");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+
+    // Actually get info from the card NOW
+    //std::vector<bytestring> commands = verifier.get_proof_commands();
+    
+
+
 
     return PAM_SUCCESS;
 }
