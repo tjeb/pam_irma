@@ -18,6 +18,26 @@
 #include "silvia/silvia_idemix_xmlreader.h"
 #include "silvia/silvia_types.h"
 
+
+
+void set_parameters()
+{
+    ////////////////////////////////////////////////////////////////////
+    // Set the system parameters in the IRMA library; this function must
+    // be updated if we ever change the parameters for IRMA cards!!!
+    ////////////////////////////////////////////////////////////////////
+
+    silvia_system_parameters::i()->set_l_n(1024);
+    silvia_system_parameters::i()->set_l_m(256);
+    silvia_system_parameters::i()->set_l_statzk(80);
+    silvia_system_parameters::i()->set_l_H(256);
+    silvia_system_parameters::i()->set_l_v(1700);
+    silvia_system_parameters::i()->set_l_e(597);
+    silvia_system_parameters::i()->set_l_e_prime(120);
+    silvia_system_parameters::i()->set_hash_type("sha256");
+}
+
+
 PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
     printf("sm_setced-print");
