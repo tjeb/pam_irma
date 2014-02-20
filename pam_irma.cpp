@@ -47,6 +47,8 @@ PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const cha
 
 PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
+    set_parameters();
+
     int result;
 
     pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Testing123!");
@@ -56,5 +58,5 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Username: %s", username);
 
-    return PAM_AUTH_ERR;
+    return PAM_SUCCESS;
 }
