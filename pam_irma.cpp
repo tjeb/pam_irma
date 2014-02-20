@@ -8,8 +8,6 @@
 #include <security/pam_modules.h>
 #include <security/pam_ext.h>
 
-#include "pam_irma_details.h"
-
 #include "silvia/silvia_parameters.h"
 #include "silvia/silvia_irma_verifier.h"
 #include "silvia/silvia_nfc_card.h"
@@ -40,9 +38,6 @@ void set_parameters()
 
 PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
-    printf("sm_setced-print");
-    pam_syslog(pamh, LOG_AUTH | LOG_ERR, "sm_setcred");
-
     return PAM_SUCCESS;
 }
 
