@@ -226,11 +226,13 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     if(!communicate_with_card(pamh, conv, card, commands, results))
     {
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to select application on card");
+        delete card;
         return PAM_AUTHINFO_UNAVAIL;
     }
     if(!verifier.submit_select_data(results))
     {
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to verify application selection");
+        delete card;
         return PAM_AUTHINFO_UNAVAIL;
     }
     commands.clear();
@@ -244,6 +246,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     {
         verifier.abort();
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to execute proof comments");
+        delete card;
         return PAM_AUTHINFO_UNAVAIL;
     }
     std::vector<std::pair<std::string, bytestring> > revealed;
@@ -251,11 +254,13 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     if(!verifier.submit_and_verify(results, revealed))
     {
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Verification failed");
+        delete card;
         return PAM_AUTHINFO_UNAVAIL;
     }
     if(revealed.size() <= 0)
     {
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "No attributes revealed");
+        delete card;
         return PAM_AUTHINFO_UNAVAIL;
     }
     
@@ -280,5 +285,6 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     }
 
+    delete card;
     return PAM_AUTHINFO_UNAVAIL;
 }
