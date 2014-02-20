@@ -10,6 +10,14 @@
 
 #include "pam_irma_details.h"
 
+#include "silvia/silvia_parameters.h"
+#include "silvia/silvia_irma_verifier.h"
+#include "silvia/silvia_nfc_card.h"
+#include "silvia/silvia_card_channel.h"
+#include "silvia/silvia_irma_xmlreader.h"
+#include "silvia/silvia_idemix_xmlreader.h"
+#include "silvia/silvia_types.h"
+
 PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
     printf("sm_setced-print");
