@@ -438,7 +438,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     for(; i != revealed.end(); i++)
     {
-        if(strcmp(i->first.c_str(), config->attribute_key))
+        if(strcmp(i->first.c_str(), config->attribute_key) == 0)
         {
             if(strcmp(config->attribute_value, (const char*) bs2str(i->second).byte_str()) == 0)
             {
