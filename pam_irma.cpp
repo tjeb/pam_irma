@@ -137,13 +137,11 @@ bytestring bs2str(const bytestring& in)
 
 void wait_for_disconnect(const pam_conv *conv, silvia_card_channel *card)
 {
-    
-    show_pam_info(conv, "Pleae remove card");
+    show_pam_info(conv, "Please remove card");
     while(card->status())
     {
         usleep(10000);
     }
-    silvia_nfc_card_monitor::i()->~silvia_nfc_card_monitor();
 }
 
 bool communicate_with_card(pam_handle_t *pamh, const pam_conv *conv, silvia_card_channel* card, std::vector<bytestring>& commands, std::vector<bytestring>& results)
