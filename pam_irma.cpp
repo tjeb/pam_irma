@@ -334,11 +334,14 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         {
             if(strcmp("Portland", (const char*) bs2str(i->second).byte_str()) == 0)
             {
-                printf("CORRECT\n");
+                delete card;
+                return PAM_SUCCESS;
             }
             else
             {
-                printf("INCORRECT\n");
+                pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Invalid attribute value!");
+                delete card;
+                return PAM_AUTH_ERR;
             }
         }
 
