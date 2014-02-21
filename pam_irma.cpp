@@ -26,6 +26,11 @@
 #include <unistd.h>
 #include <time.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <fstream>
+#include <errno.h>
+#include <string.h>
 
 #define PAM_SM_AUTH
 #include <security/pam_appl.h>
@@ -39,11 +44,6 @@
 #include <silvia/silvia_irma_xmlreader.h>
 #include <silvia/silvia_idemix_xmlreader.h>
 #include <silvia/silvia_types.h>
-
-
-#define VERIFIER_XML_PATH "/etc/silvia/verifier.xml"
-#define ISSUER_XML_PATH "/etc/silvia/issuer.xml"
-#define ISSUER_IPK_PATH "/etc/silvia/ipk.xml"
 
 
 const char* weekday[7] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
@@ -73,7 +73,72 @@ void set_parameters()
 
 PAM_EXTERN int pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 {
+    //Initialization. We do nothing here
     return PAM_SUCCESS;
+}
+
+struct user_config_t
+{
+    const char *issuer_xml_path;
+    const char *verifier_xml_path;
+    const char *issuer_key_path;
+    const char *attribute_key;
+    const char *attribute_value;
+};
+typedef struct user_config_t user_config;
+
+user_config *get_config(pam_handle_t *pamh, const char *username)
+{
+    struct passwd *pwd = getpwnam(username);
+    if(pwd == NULL)
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to get user homedir: %s", strerror(errno));
+        return NULL;
+    }
+    else
+    {
+        chdir(pwd->pw_dir);
+        std::ifstream infile(".irma", std::ifstream::in);
+        if(!infile.is_open())
+        {
+            pam_syslog(pamh, LOG_AUTH | LOG_INFO, "No config file at %s/.irma", pwd->pw_dir);
+            return (user_config*)0x1;
+        }
+        user_config *config = (user_config*)malloc(sizeof(user_config));
+        std::string key, value;
+        while(infile >> key >> value)
+        {
+            char *val_str = (char*)malloc(sizeof(char) * (value.length() + 1));
+            strcpy(val_str, value.c_str());
+            if(key == "ISSUER-XML")
+            {
+                config->issuer_xml_path = val_str;
+            }
+            else if(key == "VERIFIER-XML")
+            {
+                config->verifier_xml_path = val_str;
+            }
+            else if(key == "ISSUER-KEY")
+            {
+                config->issuer_key_path = val_str;
+            }
+            else if(key == "ATTRIBUTE-KEY")
+            {
+                config->attribute_key = val_str;
+            }
+            else if(key == "ATTRIBUTE-CORRECT")
+            {
+                config->attribute_value = val_str;
+            }
+            else
+            {
+                pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Invalid key found: %s", key.c_str());
+                return NULL;
+            }
+        }
+        infile.close();
+        return config;
+    }
 }
 
 void show_pam_info(const pam_conv *conv, const char *msgtxt)
@@ -217,6 +282,23 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     int result;
     const char *username;
     result = pam_get_user(pamh, &username, NULL);
+    if(result != PAM_SUCCESS)
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to get username");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    // Get the configuration
+    user_config *config = get_config(pamh, username);
+    if(config == NULL)
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to get user config");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    else if(config == (user_config*)0x1)
+    {
+        //If we have no config, lets just assume they dont use this module
+        return PAM_SUCCESS;
+    }
 
     const void *conv_void;
     if(pam_get_item(pamh, PAM_CONV, &conv_void) != PAM_SUCCESS)
@@ -228,13 +310,13 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     // Initiate IRMA stuff
     set_parameters();
-    vspec = silvia_irma_xmlreader::i()->read_verifier_spec(ISSUER_XML_PATH, VERIFIER_XML_PATH);
+    vspec = silvia_irma_xmlreader::i()->read_verifier_spec(config->issuer_xml_path, config->verifier_xml_path);
     if(vspec == NULL)
     {
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read issuer and verifier specs");
         return PAM_AUTHINFO_UNAVAIL;
     }
-    pubkey = silvia_idemix_xmlreader::i()->read_idemix_pubkey(ISSUER_IPK_PATH);
+    pubkey = silvia_idemix_xmlreader::i()->read_idemix_pubkey(config->issuer_key_path);
     if(pubkey == NULL)
     {
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read issuer public key");
@@ -356,15 +438,9 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     for(; i != revealed.end(); i++)
     {
-        /*const char *key = i->first.c_str();
-        unsigned char *value = bs2str(i->second).byte_str();
-
-        printf("Key: %s\n", key);
-        printf("Value: %s\n", value);*/
-
-        if(i->first == "city")
+        if(strcmp(i->first.c_str(), config->attribute_key))
         {
-            if(strcmp("Portland", (const char*) bs2str(i->second).byte_str()) == 0)
+            if(strcmp(config->attribute_value, (const char*) bs2str(i->second).byte_str()) == 0)
             {
                 wait_for_disconnect(conv, card);
                 delete card;
