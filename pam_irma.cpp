@@ -324,11 +324,13 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     show_pam_info(conv, "INFOS: ");
     for(; i != revealed.end(); i++)
     {
-        const char *key = i->first.c_str();
+        /*const char *key = i->first.c_str();
         unsigned char *value = bs2str(i->second).byte_str();
 
         printf("Key: %s\n", key);
-        printf("Value: %s\n", value);
+        printf("Value: %s\n", value);*/
+
+        printf("%s|%s\n", i->first.c_str(), (const char*) bs2str(i->second).byte_str());
 
     }
 
