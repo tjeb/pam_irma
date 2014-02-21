@@ -137,6 +137,7 @@ bytestring bs2str(const bytestring& in)
 
 void wait_for_disconnect(const pam_conv *conv, silvia_card_channel *card)
 {
+    
     show_pam_info(conv, "Pleae remove card");
     while(card->status())
     {
