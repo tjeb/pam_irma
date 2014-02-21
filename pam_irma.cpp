@@ -137,7 +137,6 @@ bytestring bs2str(const bytestring& in)
 
 bool communicate_with_card(pam_handle_t *pamh, const pam_conv *conv, silvia_card_channel* card, std::vector<bytestring>& commands, std::vector<bytestring>& results)
 {
-    show_pam_info(conv, "Communicating with card...");
     bool comm_ok = true;
     size_t cmd_ctr = 0;
 
@@ -159,7 +158,6 @@ bool communicate_with_card(pam_handle_t *pamh, const pam_conv *conv, silvia_card
                 break;
             }
 
-            show_pam_info(conv, "Communicating with card...");
 
             if(!card->transmit(*i, result))
             {
@@ -227,7 +225,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     }
 
     // Actually get info from the card NOW
-    show_pam_info(conv, "Initializing card...");
+    show_pam_info(conv, "Communicating with card...");
     std::vector<bytestring> results;
     std::vector<bytestring> commands = verifier.get_select_commands();
     if(!communicate_with_card(pamh, conv, card, commands, results))
@@ -244,7 +242,6 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     }
     commands.clear();
     results.clear();
-    show_pam_info(conv, "Communicating with card...");
     bool comm_ok = true;
     size_t cmd_ctr = 0;
 
@@ -257,7 +254,6 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         return PAM_AUTHINFO_UNAVAIL;
     }
     std::vector<std::pair<std::string, bytestring> > revealed;
-    show_pam_info(conv, "Verifying...");
     if(!verifier.submit_and_verify(results, revealed))
     {
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Verification failed");
@@ -321,7 +317,6 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         i++;
     }
 
-    show_pam_info(conv, "INFOS: ");
     for(; i != revealed.end(); i++)
     {
         /*const char *key = i->first.c_str();
