@@ -330,7 +330,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         printf("Key: %s\n", key);
         printf("Value: %s\n", value);*/
 
-        printf("%s|%s\n", i->first.c_str(), (const char*) bs2str(i->second).byte_str());
+        printf("%s\n", (const char*) bs2str(i->second).byte_str());
 
     }
 
