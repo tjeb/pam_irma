@@ -1,7 +1,26 @@
-#include <stdlib.h>
+/** 
+ * Copyright (c) 2014, Patrick Uiterwijk <puiterwijk@gmail.com>
+ * All rights reserved.
+ *
+ * This file is part of pam_irma.
+ *
+ * pam_irma is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * pam_irma is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with pam_irma.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <stdio.h>
 #include <syslog.h>
-
+#include <stdlib.h>
 #include <string>
 #include <iostream>
 #include <unistd.h>
@@ -9,7 +28,6 @@
 #include <signal.h>
 
 #define PAM_SM_AUTH
-
 #include <security/pam_appl.h>
 #include <security/pam_modules.h>
 #include <security/pam_ext.h>
