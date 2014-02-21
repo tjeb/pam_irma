@@ -243,6 +243,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to select application on card");
         wait_for_disconnect(conv, card);
         delete card;
+        card = NULL;
         return PAM_AUTHINFO_UNAVAIL;
     }
     if(!verifier.submit_select_data(results))
@@ -250,6 +251,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to verify application selection");
         wait_for_disconnect(conv, card);
         delete card;
+        card = NULL;
         return PAM_AUTHINFO_UNAVAIL;
     }
     commands.clear();
@@ -264,6 +266,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Unable to execute proof comments");
         wait_for_disconnect(conv, card);
         delete card;
+        card = NULL;
         return PAM_AUTHINFO_UNAVAIL;
     }
     std::vector<std::pair<std::string, bytestring> > revealed;
@@ -272,6 +275,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Verification failed");
         wait_for_disconnect(conv, card);
         delete card;
+        card = NULL;
         return PAM_AUTHINFO_UNAVAIL;
     }
     if(revealed.size() <= 0)
@@ -279,6 +283,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "No attributes revealed");
         wait_for_disconnect(conv, card);
         delete card;
+        card = NULL;
         return PAM_AUTHINFO_UNAVAIL;
     }
     
@@ -346,6 +351,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
             {
                 wait_for_disconnect(conv, card);
                 delete card;
+                card = NULL;
                 return PAM_SUCCESS;
             }
             else
@@ -353,6 +359,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
                 pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Invalid attribute value!");
                 wait_for_disconnect(conv, card);
                 delete card;
+                card = NULL;
                 return PAM_AUTH_ERR;
             }
         }
@@ -361,5 +368,6 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     wait_for_disconnect(conv, card);
     delete card;
+    card = NULL;
     return PAM_AUTHINFO_UNAVAIL;
 }
