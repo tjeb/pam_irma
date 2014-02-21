@@ -330,7 +330,17 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
         printf("Key: %s\n", key);
         printf("Value: %s\n", value);*/
 
-        printf("%s\n", (const char*) bs2str(i->second).byte_str());
+        if(i->first == "city")
+        {
+            if(strcmp("Portland", (const char*) bs2str(i->second).byte_str()) == 0)
+            {
+                printf("CORRECT\n");
+            }
+            else
+            {
+                printf("INCORRECT\n");
+            }
+        }
 
     }
 
