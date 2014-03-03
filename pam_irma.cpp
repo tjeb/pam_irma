@@ -347,9 +347,9 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     silvia_irma_verifier verifier(pubkey, vspec);
 
 
-    show_pam_info(conv, "Please hold card against reader");
     card = NULL;
     #ifdef USE_NFC
+    show_pam_info(conv, "NFC: Please hold card against reader");
     silvia_nfc_card *nfc_card = NULL;
     if(!silvia_nfc_card_monitor::i()->wait_for_card(&nfc_card))
     {
@@ -359,6 +359,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     card = nfc_card;
     #endif
     #ifdef USE_PCSC
+    show_pam_info(conv, "PC/SC: Please hold card against reader");
     silvia_pcsc_card *pcsc_card = NULL;
     if(!silvia_pcsc_card_monitor::i()->wait_for_card(&pcsc_card))
     {
