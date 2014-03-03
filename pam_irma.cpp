@@ -18,6 +18,23 @@
  * along with pam_irma.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+//#define USE_NFC true
+//#define USE_PCSC true
+
+
+// We can only support exactly one (for now)
+#ifdef USE_NFC
+#ifdef USE_PCSC
+#error Only use either NFC or PCSC
+#endif
+#endif
+#ifndef USE_NFC
+#ifndef USE_PCSC
+#error Enable either NFC or PCSC
+#endif
+#endif
+
+
 #include <stdio.h>
 #include <syslog.h>
 #include <stdlib.h>
@@ -39,7 +56,12 @@
 
 #include <silvia/silvia_parameters.h>
 #include <silvia/silvia_irma_verifier.h>
+#ifdef USE_NFC
 #include <silvia/silvia_nfc_card.h>
+#endif
+#ifdef USE_PCSC
+#include <silvia/silvia_pcsc_card.h>
+#endif
 #include <silvia/silvia_card_channel.h>
 #include <silvia/silvia_irma_xmlreader.h>
 #include <silvia/silvia_idemix_xmlreader.h>
@@ -276,7 +298,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     int exitcode = PAM_AUTH_ERR;
     silvia_verifier_specification *vspec;
     silvia_pub_key *pubkey;
-    silvia_nfc_card *card;
+    silvia_card_channel *card;
 
     // Get the username
     int result;
@@ -327,11 +349,24 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
 
     show_pam_info(conv, "Please hold card against reader");
     card = NULL;
-    if(!silvia_nfc_card_monitor::i()->wait_for_card(&card))
+    #ifdef USE_NFC
+    silvia_nfc_card *nfc_card = NULL;
+    if(!silvia_nfc_card_monitor::i()->wait_for_card(&nfc_card))
     {
         pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read the card");
         return PAM_AUTHINFO_UNAVAIL;
     }
+    card = nfc_card;
+    #endif
+    #ifdef USE_PCSC
+    silvia_pcsc_card *pcsc_card = NULL;
+    if(!silvia_pcsc_card_monitor::i()->wait_for_card(&pcsc_card))
+    {
+        pam_syslog(pamh, LOG_AUTH | LOG_ERR, "Failed to read the card");
+        return PAM_AUTHINFO_UNAVAIL;
+    }
+    card = pcsc_card;
+    #endif
 
     // Actually get info from the card NOW
     show_pam_info(conv, "Communicating with card...");
