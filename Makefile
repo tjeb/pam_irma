@@ -1,6 +1,6 @@
-.PHONY: install do nfc pcsc install_pcsc install_nfc clean
+.PHONY: install install_pcsc install_nfc clean uninstall uninstall_nfc uninstall_pcsc
 
-all: nfc pcsc
+all: pam_irma_nfc.so pam_irma_pcsc.so
 
 pam_irma_nfc.so:
 	g++ -fPIC -o pam_irma_nfc.o -c pam_irma.cpp `pkg-config --cflags libnfc` -DUSE_NFC
@@ -19,6 +19,14 @@ install_pcsc: pam_irma_pcsc.so
 
 install_nfc: pam_irma_nfc.so
 	sudo cp pam_irma_nfc.so /usr/lib64/security/pam_irma_nfc.so
+
+uninstall: uninstall_nfc uninstall_pcsc
+
+uninstall_nfc:
+	sudo rm -f /usr/lib64/security/pam_irma_nfc.so
+
+uninstall_pcsc:
+	sudo rm -f /usr/lib64/security/pam_irma_pcsc.so
 
 clean:
 	rm -f *.so
