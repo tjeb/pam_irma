@@ -319,7 +319,7 @@ PAM_EXTERN int pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, cons
     else if(config == (user_config*)0x1)
     {
         //If we have no config, lets just assume they dont use this module
-        return PAM_SUCCESS;
+        return PAM_AUTHINFO_UNAVAIL;
     }
 
     const void *conv_void;
