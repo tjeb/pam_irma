@@ -1,0 +1,39 @@
+CFLAGS=@CFLAGS@
+LDFLAGS=@LDFLAGS@
+CXX=@CXX@
+
+PAM_LIBDIR=@PAM_LIBDIR@
+
+.PHONY: install install_pcsc install_nfc clean uninstall uninstall_nfc uninstall_pcsc
+
+all: @NFC_SO@ @PCSC_SO@
+
+pam_irma_nfc.so: pam_irma.cpp
+	${CXX} -fPIC -o pam_irma_nfc.o -c pam_irma.cpp `pkg-config --cflags libnfc` -DUSE_NFC ${CFLAGS} ${LDFLAGS}
+	${CXX} -shared -o pam_irma_nfc.so pam_irma_nfc.o -lpam `pkg-config --libs --cflags libnfc` ${CFLAGS} ${LDFLAGS}
+	rm -f pam_irma_nfc.o
+
+pam_irma_pcsc.so: pam_irma.cpp
+	${CXX} -fPIC -o pam_irma_pcsc.o -c pam_irma.cpp `pkg-config --cflags libpcsclite` -DUSE_PCSC ${CFLAGS} ${LDFLAGS}
+	${CXX} -shared -o pam_irma_pcsc.so pam_irma_pcsc.o -lpam `pkg-config --libs --cflags libpcsclite` ${CFLAGS} ${LDFLAGS}
+	rm -f pam_irma_pcsc.o
+
+install: @INSTALL_NFC@ @INSTALL_PCSC@
+
+install_pcsc: pam_irma_pcsc.so
+	cp pam_irma_pcsc.so ${PAM_LIBDIR}/pam_irma_pcsc.so
+
+install_nfc: pam_irma_nfc.so
+	cp pam_irma_nfc.so ${PAM_LIBDIR}/pam_irma_nfc.so
+
+uninstall: @UNINSTALL_NFC@ @UNINSTALL_PCSC@
+
+uninstall_nfc:
+	sudo rm -f ${PAM_LIBDIR}/pam_irma_nfc.so
+
+uninstall_pcsc:
+	sudo rm -f ${PAM_LIBDIR}/pam_irma_pcsc.so
+
+clean:
+	rm -f *.so
+	rm -f *.o
